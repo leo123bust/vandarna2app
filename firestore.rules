@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    match /buildings/{id} {
+      function changed() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+      // A user may confirm a building once, and never their own submission.
+      function verifyOnly() {
+        return changed().hasOnly(['verifiedBy', 'lastVerifiedAt'])
+          && request.auth.uid != resource.data.createdBy
+          && !(request.auth.uid in resource.data.verifiedBy)
+          && request.auth.uid in request.resource.data.verifiedBy
+          && request.resource.data.verifiedBy.size() == resource.data.verifiedBy.size() + 1;
+      }
+      function reportOnly() {
+        return changed().hasOnly(['reports'])
+          && request.resource.data.reports.size() == resource.data.reports.size() + 1
+          && request.resource.data.reports[request.resource.data.reports.size() - 1].uid == request.auth.uid;
+      }
+      function historyOnly() {
+        return changed().hasOnly(['history'])
+          && request.resource.data.history.size() == resource.data.history.size() + 1
+          && request.resource.data.history[request.resource.data.history.size() - 1].authorId == request.auth.uid;
+      }
+
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.description.size() <= 4000
+        && request.resource.data.verifiedBy.size() == 0
+        && request.resource.data.reports.size() == 0;
+      allow update: if signedIn() && (verifyOnly() || reportOnly() || historyOnly());
+      allow delete: if false;
+    }
+
+    match /favorites/{favId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && favId == request.auth.uid + '_' + request.resource.data.buildingId;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // Written by trusted server code only (Cloud Functions), read by the owner.
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+  }
+}

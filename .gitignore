@@ -1,0 +1,29 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+android/app/release.jks
+*.jks
+*.keystore
+android/gradlew.bat.bak
+captures/
+# Secrets - never commit
+google-services.json
+GoogleService-Info.plist
+.env
+*.pem
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
